@@ -1,0 +1,71 @@
+# =========================================================
+#  Secretos y configuración local
+# =========================================================
+.env
+.env.*
+!.env.example
+
+# =========================================================
+#  Datos de la app (no se versionan)
+# =========================================================
+backups/*
+!backups/.gitkeep
+*.sql
+*.sql.gz
+*.dump
+
+# =========================================================
+#  Python
+# =========================================================
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# =========================================================
+#  macOS
+# =========================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.DocumentRevisions-V100
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+__MACOSX/
+Icon?
+
+# =========================================================
+#  Windows
+# =========================================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+[Dd]esktop.ini
+
+# =========================================================
+#  Editores
+# =========================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================================================
+#  Logs y temporales
+# =========================================================
+*.log
+*.tmp
+*.bak
