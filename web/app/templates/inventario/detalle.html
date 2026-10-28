@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block titulo %}{{ p.nombre }}{% endblock %}
+{% block contenido %}
+{% set etiquetas = {'alta': ('Alta', 'secondary'), 'entrada': ('Entrada', 'success'), 'ajuste': ('Ajuste', 'warning'),
+                    'importacion': ('Importación', 'info'), 'venta': ('Venta', 'primary'), 'cancelacion': ('Cancelación', 'danger')} %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('inventario.lista') }}">Inventario</a></li>
+  <li class="breadcrumb-item active">{{ p.nombre }}</li>
+</ol></nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ p.nombre }} {% if p.es_servicio %}<span class="badge bg-info text-dark align-middle fs-6">Servicio</span>{% endif %} {% if not p.activo %}<span class="badge bg-secondary align-middle fs-6">Desactivado</span>{% endif %}</h1>
+    <code>{{ p.codigo }}</code>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('inventario.editar', pid=p.id) }}"><i class="bi bi-pencil"></i> Editar</a>
+    <form method="post" action="{{ url_for('inventario.cambiar_activo', pid=p.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if p.activo %}
+      <button class="btn btn-outline-danger"><i class="bi bi-eye-slash"></i> Desactivar</button>
+      {% else %}
+      <button class="btn btn-outline-success"><i class="bi bi-eye"></i> Reactivar</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Stock</div>
+    {% if p.es_servicio %}
+    <div class="valor">—</div><div class="small text-muted">Servicio sin control de stock</div>
+    {% else %}
+    <div class="valor {% if p.stock == 0 %}sin-stock{% elif p.stock <= p.stock_minimo %}stock-bajo{% endif %}">{{ p.stock|numero }}</div>
+    <div class="small text-muted">Mínimo: {{ p.stock_minimo }}</div>
+    {% endif %}</div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Precio</div><div class="valor">{{ p.precio|dinero }}</div>
+    <div class="small text-muted">Costo: {{ p.costo|dinero }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Margen</div>
+    <div class="valor">{{ (p.precio - p.costo)|dinero }}</div>
+    <div class="small text-muted">{% if p.precio > 0 %}{{ '%.0f'|format((p.precio - p.costo) / p.precio * 100) }}% del precio{% endif %}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Vendido (30 días)</div>
+    <div class="valor">{{ vendidos.piezas|numero }} pzas</div>
+    <div class="small text-muted">{{ vendidos.total|dinero }}</div></div></div>
+</div>
+
+{% if p.es_servicio and p.precio <= 0 %}
+<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Este servicio no tiene precio y no se puede vender en caja.
+  <a href="{{ url_for('inventario.editar', pid=p.id) }}">Definir precio</a></div>
+{% endif %}
+<div class="row g-3">
+  {% if not p.es_servicio %}
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h2 class="h6"><i class="bi bi-plus-slash-minus"></i> Entrada / ajuste de stock</h2>
+      <form method="post" action="{{ url_for('inventario.ajustar_stock', pid=p.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="tipo" id="t-entrada" value="entrada" checked>
+            <label class="form-check-label" for="t-entrada"><strong>Entrada</strong>: llegó mercancía (se suma)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="tipo" id="t-ajuste" value="ajuste">
+            <label class="form-check-label" for="t-ajuste"><strong>Ajuste</strong>: fijar el stock real (conteo, merma)</label>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small" id="lbl-cantidad">Cantidad que entra</label>
+          <input class="form-control" type="number" name="cantidad" min="0" step="1" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Nota <span id="nota-req" class="text-danger d-none">(obligatoria)</span></label>
+          <input class="form-control" name="nota" maxlength="300" placeholder="Ej. proveedor, factura, motivo">
+        </div>
+        <button class="btn btn-primary w-100">Registrar</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+  <div class="{{ 'col-12' if p.es_servicio else 'col-lg-8' }}">
+    <div class="card">
+      <div class="card-header bg-white"><strong><i class="bi bi-journal-text"></i> Movimientos</strong>
+        <span class="text-muted small">(últimos 200)</span></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Fecha</th><th>Tipo</th><th class="num">Cambio</th><th class="num">Stock</th><th>Detalle</th></tr></thead>
+          <tbody>
+          {% for m in movimientos %}
+            {% set et = etiquetas.get(m.tipo, (m.tipo, 'secondary')) %}
+            <tr>
+              <td class="text-nowrap">{{ m.fecha|fecha_hora }}</td>
+              <td><span class="badge bg-{{ et[1] }}">{{ et[0] }}</span></td>
+              <td class="num {{ 'text-success' if m.cantidad > 0 else ('text-danger' if m.cantidad < 0 else '') }}">{{ '%+d'|format(m.cantidad) }}</td>
+              <td class="num">{{ m.stock_resultante }}</td>
+              <td class="small">
+                {% if m.venta_id %}<a href="{{ url_for('ventas.detalle', vid=m.venta_id) }}">Venta #{{ m.venta_id }}</a>{% endif %}
+                {% if m.nota %}<span class="text-muted">{{ m.nota }}</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-muted text-center py-3">Sin movimientos.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[name=tipo]').forEach(function (r) {
+  r.addEventListener('change', function () {
+    var ajuste = document.getElementById('t-ajuste').checked;
+    document.getElementById('lbl-cantidad').textContent = ajuste ? 'Stock real contado' : 'Cantidad que entra';
+    document.getElementById('nota-req').classList.toggle('d-none', !ajuste);
+    document.querySelector('[name=nota]').required = ajuste;
+  });
+});
+</script>
+{% endblock %}

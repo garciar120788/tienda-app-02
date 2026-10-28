@@ -1,0 +1,54 @@
+name: tienda
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tienda-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-America/Mexico_City}
+      PGTZ: ${TZ:-America/Mexico_City}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - interna
+    # La base de datos NO se expone fuera de Docker; solo el contenedor web la ve.
+
+  web:
+    build: ./web
+    image: tienda-web:latest
+    container_name: tienda-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SESSION_MINUTES: ${SESSION_MINUTES:-60}
+      STORE_NAME: ${STORE_NAME:-Mi Tienda}
+      TZ: ${TZ:-America/Mexico_City}
+    ports:
+      - "${WEB_PORT:-8080}:8000"
+    networks:
+      - interna
+
+volumes:
+  db_data:
+
+networks:
+  interna:

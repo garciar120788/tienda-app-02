@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Vista previa de importación{% endblock %}
+{% block contenido %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('inventario.lista') }}">Inventario</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('inventario.importar') }}">Importar</a></li>
+  <li class="breadcrumb-item active">Vista previa</li>
+</ol></nav>
+<h1 class="h4">Vista previa: {{ nombre_archivo }}</h1>
+
+<div class="row g-3 my-2">
+  <div class="col-4"><div class="card kpi p-3"><div class="etiqueta">Nuevos</div><div class="valor text-success">{{ resumen.nuevos }}</div></div></div>
+  <div class="col-4"><div class="card kpi p-3"><div class="etiqueta">A actualizar</div><div class="valor text-primary">{{ resumen.actualizar }}</div></div></div>
+  <div class="col-4"><div class="card kpi p-3"><div class="etiqueta">Con errores</div><div class="valor {{ 'text-danger' if resumen.errores else '' }}">{{ resumen.errores }}</div></div></div>
+</div>
+
+{% if resumen.nuevos + resumen.actualizar > 0 %}
+<div class="card p-3 mb-3">
+  <form method="post" action="{{ url_for('inventario.importar_confirmar') }}" class="row g-2 align-items-center">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if resumen.actualizar %}
+    <div class="col-md-7">
+      <label class="form-label small mb-1">Para productos que ya existen, el stock del archivo:</label>
+      <select class="form-select" name="modo_stock">
+        <option value="sumar">Se SUMA al stock actual (llegó mercancía)</option>
+        <option value="reemplazar">REEMPLAZA el stock actual (conteo de inventario)</option>
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-md-5 d-flex gap-2 align-items-end {% if resumen.actualizar %}pt-md-4{% endif %}">
+      <button class="btn btn-success"><i class="bi bi-check-lg"></i> Confirmar importación</button>
+      <a class="btn btn-link" href="{{ url_for('inventario.importar') }}">Cancelar</a>
+    </div>
+    {% if resumen.errores %}
+    <div class="col-12 small text-danger">Las {{ resumen.errores }} filas con errores se omitirán. Corrígelas en el archivo y vuelve a importarlas si las necesitas.</div>
+    {% endif %}
+  </form>
+</div>
+{% else %}
+<div class="alert alert-danger">No hay filas válidas para importar. Revisa los errores y vuelve a subir el archivo.
+  <a href="{{ url_for('inventario.importar') }}">Volver</a></div>
+{% endif %}
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-light"><tr><th>Fila</th><th>Acción</th><th>Código</th><th>Nombre</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Stock archivo</th><th class="num">Stock actual</th></tr></thead>
+      <tbody>
+      {% for f in filas %}
+        <tr class="{{ 'table-danger' if f.errores else '' }}">
+          <td>{{ f.fila }}</td>
+          <td>
+            {% if f.errores %}<span class="badge bg-danger">Error</span>
+            {% elif f.accion == 'nuevo' %}<span class="badge bg-success">Nuevo</span>
+            {% else %}<span class="badge bg-primary">Actualizar</span>{% endif %}
+          </td>
+          <td><code>{{ f.codigo or '' }}</code></td>
+          <td>{{ f.nombre or '' }}
+            {% if f.errores %}<div class="small text-danger">{{ f.errores|join('; ') }}</div>{% endif %}</td>
+          <td class="num">{{ f.precio|dinero if f.precio else '' }}</td>
+          <td class="num">{{ f.costo|dinero if f.costo else '—' }}</td>
+          <td class="num">{{ f.stock if f.stock is not none else '—' }}</td>
+          <td class="num">{{ f.stock_actual if f.stock_actual is not none else '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

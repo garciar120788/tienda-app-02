@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}Ventas{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Historial de ventas</h1>
+  <a class="btn btn-success" href="{{ url_for('ventas.caja') }}"><i class="bi bi-cart-plus"></i> Nueva venta</a>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <form class="row g-2 align-items-end" method="get">
+    <div class="col-6 col-md-3"><label class="form-label small">Desde</label>
+      <input class="form-control" type="date" name="desde" value="{{ desde }}"></div>
+    <div class="col-6 col-md-3"><label class="form-label small">Hasta</label>
+      <input class="form-control" type="date" name="hasta" value="{{ hasta }}"></div>
+    <div class="col-8 col-md-3"><label class="form-label small">Estado</label>
+      <select class="form-select" name="estado">
+        <option value="">Todas</option>
+        <option value="completada" {% if estado == 'completada' %}selected{% endif %}>Completadas</option>
+        <option value="cancelada" {% if estado == 'cancelada' %}selected{% endif %}>Canceladas</option>
+      </select></div>
+    <div class="col-4 col-md-3 d-grid"><button class="btn btn-secondary">Filtrar</button></div>
+  </form>
+</div></div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light"><tr><th>#</th><th>Fecha</th><th class="num">Piezas</th><th class="num">Total</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for v in ventas %}
+        <tr>
+          <td><a href="{{ url_for('ventas.detalle', vid=v.id) }}">{{ v.id }}</a></td>
+          <td>{{ v.fecha|fecha_hora }}</td>
+          <td class="num">{{ v.piezas or 0 }}</td>
+          <td class="num {% if v.estado == 'cancelada' %}text-decoration-line-through text-muted{% endif %}">{{ v.total|dinero }}</td>
+          <td>{% if v.estado == 'cancelada' %}<span class="badge bg-danger">Cancelada</span>{% else %}<span class="badge bg-success">Completada</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No hay ventas en este periodo.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if ventas %}
+      <tfoot class="table-light"><tr><th colspan="3">Total vendido (sin canceladas)</th><th class="num">{{ total|dinero }}</th><th></th></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

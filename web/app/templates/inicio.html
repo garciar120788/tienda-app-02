@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <h1 class="h3 mb-0">Resumen</h1>
+  <a class="btn btn-success btn-lg" href="{{ url_for('ventas.caja') }}"><i class="bi bi-cart-plus"></i> Nueva venta</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card kpi p-3">
+    <div class="etiqueta">Vendido hoy</div><div class="valor">{{ hoy.total|dinero }}</div>
+    <div class="text-muted small">{{ hoy.ventas }} venta{{ '' if hoy.ventas == 1 else 's' }}</div>
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3">
+    <div class="etiqueta">Vendido este mes</div><div class="valor">{{ mes.total|dinero }}</div>
+    <div class="text-muted small">{{ mes.ventas }} venta{{ '' if mes.ventas == 1 else 's' }}</div>
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3">
+    <div class="etiqueta">Productos activos</div><div class="valor">{{ inventario.productos|numero }}</div>
+    <div class="text-muted small">{{ inventario.piezas|numero }} piezas en stock</div>
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3">
+    <div class="etiqueta">Inventario a costo</div><div class="valor">{{ inventario.valor_costo|dinero }}</div>
+    <div class="text-muted small">Valor de lo que hay en stock</div>
+  </div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-exclamation-triangle text-warning"></i> Stock bajo</strong>
+        <a class="small" href="{{ url_for('inventario.lista', filtro='bajo') }}">Ver todos ({{ alertas_stock }})</a>
+      </div>
+      {% if bajos %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Producto</th><th class="num">Stock</th><th class="num">Mínimo</th></tr></thead>
+          <tbody>
+          {% for p in bajos %}
+            <tr>
+              <td><a href="{{ url_for('inventario.detalle', pid=p.id) }}">{{ p.nombre }}</a><div class="small text-muted">{{ p.codigo }}</div></td>
+              <td class="num {{ 'sin-stock' if p.stock == 0 else 'stock-bajo' }}">{{ p.stock }}</td>
+              <td class="num">{{ p.stock_minimo }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted"><i class="bi bi-check-circle text-success"></i> Todos los productos están por encima de su mínimo.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-clock-history"></i> Ventas recientes</strong>
+        <a class="small" href="{{ url_for('ventas.lista') }}">Ver historial</a>
+      </div>
+      {% if recientes %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>#</th><th>Fecha</th><th class="num">Piezas</th><th class="num">Total</th></tr></thead>
+          <tbody>
+          {% for v in recientes %}
+            <tr>
+              <td><a href="{{ url_for('ventas.detalle', vid=v.id) }}">{{ v.id }}</a></td>
+              <td>{{ v.fecha|fecha_hora }}</td>
+              <td class="num">{{ v.piezas or 0 }}</td>
+              <td class="num {% if v.estado == 'cancelada' %}text-decoration-line-through text-muted{% endif %}">{{ v.total|dinero }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted">Aún no hay ventas registradas.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

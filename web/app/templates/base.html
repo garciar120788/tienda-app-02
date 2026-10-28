@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block titulo %}{% endblock %} · {{ store_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+{% if session.user_id %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top d-print-none">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('inicio.index') }}"><i class="bi bi-shop"></i> {{ store_name }}</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-label="Menú">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="nav">
+      {% set ep = request.endpoint or '' %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link {% if ep == 'inicio.index' %}active{% endif %}" href="{{ url_for('inicio.index') }}"><i class="bi bi-house"></i> Inicio</a></li>
+        <li class="nav-item"><a class="nav-link {% if ep == 'ventas.caja' %}active{% endif %}" href="{{ url_for('ventas.caja') }}"><i class="bi bi-cart3"></i> Caja</a></li>
+        <li class="nav-item"><a class="nav-link {% if ep.startswith('inventario.') %}active{% endif %}" href="{{ url_for('inventario.lista') }}"><i class="bi bi-box-seam"></i> Inventario</a></li>
+        <li class="nav-item"><a class="nav-link {% if ep in ('ventas.lista', 'ventas.detalle') %}active{% endif %}" href="{{ url_for('ventas.lista') }}"><i class="bi bi-receipt"></i> Ventas</a></li>
+        <li class="nav-item"><a class="nav-link {% if ep.startswith('reportes.') %}active{% endif %}" href="{{ url_for('reportes.index') }}"><i class="bi bi-graph-up"></i> Reportes</a></li>
+      </ul>
+      <ul class="navbar-nav">
+        {% if alertas_stock %}
+        <li class="nav-item">
+          <a class="nav-link text-warning" href="{{ url_for('inventario.lista', filtro='bajo') }}" title="Productos con stock bajo">
+            <i class="bi bi-exclamation-triangle-fill"></i> Stock bajo <span class="badge bg-warning text-dark">{{ alertas_stock }}</span>
+          </a>
+        </li>
+        {% endif %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle"></i> {{ session.username }}</a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{{ url_for('auth.cambiar_password') }}"><i class="bi bi-key"></i> Cambiar contraseña</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <form method="post" action="{{ url_for('auth.logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="dropdown-item"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button>
+              </form>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<main class="{% block contenedor %}container py-4{% endblock %}">
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in mensajes %}
+      <div class="alert alert-{{ cat if cat != 'message' else 'info' }} alert-dismissible fade show d-print-none" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+  {% block contenido %}{% endblock %}
+</main>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

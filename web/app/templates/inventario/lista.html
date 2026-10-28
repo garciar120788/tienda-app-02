@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block titulo %}Inventario{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Inventario</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('inventario.exportar') }}"><i class="bi bi-download"></i> Exportar CSV</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('inventario.importar') }}"><i class="bi bi-upload"></i> Importar Excel/CSV</a>
+    <a class="btn btn-primary" href="{{ url_for('inventario.nuevo') }}"><i class="bi bi-plus-lg"></i> Nuevo producto</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form class="row g-2" method="get">
+      <div class="col-md-6">
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Buscar por código o nombre (puedes escanear)" autofocus>
+      </div>
+      <div class="col-md-4">
+        <select class="form-select" name="filtro" onchange="this.form.submit()">
+          <option value="activos" {% if filtro == 'activos' %}selected{% endif %}>Productos activos</option>
+          <option value="bajo" {% if filtro == 'bajo' %}selected{% endif %}>Solo stock bajo</option>
+          <option value="inactivos" {% if filtro == 'inactivos' %}selected{% endif %}>Desactivados</option>
+          <option value="todos" {% if filtro == 'todos' %}selected{% endif %}>Todos</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-grid"><button class="btn btn-secondary"><i class="bi bi-search"></i> Buscar</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Código</th><th>Nombre</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Stock</th><th class="num">Mínimo</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for p in productos %}
+        <tr class="{% if not p.activo %}text-muted{% endif %}">
+          <td><code>{{ p.codigo }}</code></td>
+          <td>
+            <a href="{{ url_for('inventario.detalle', pid=p.id) }}">{{ p.nombre }}</a>
+            {% if p.es_servicio %}<span class="badge bg-info text-dark">Servicio</span>{% endif %}
+            {% if not p.activo %}<span class="badge bg-secondary">Desactivado</span>{% endif %}
+          </td>
+          <td class="num {% if p.es_servicio and p.precio <= 0 %}text-danger{% endif %}">{{ p.precio|dinero }}</td>
+          <td class="num">{{ p.costo|dinero }}</td>
+          {% if p.es_servicio %}
+          <td class="num text-muted">—</td><td class="num text-muted">—</td>
+          {% else %}
+          <td class="num {% if p.activo and p.stock == 0 %}sin-stock{% elif p.activo and p.stock <= p.stock_minimo %}stock-bajo{% endif %}">
+            {% if p.activo and p.stock <= p.stock_minimo %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+            {{ p.stock|numero }}
+          </td>
+          <td class="num">{{ p.stock_minimo }}</td>
+          {% endif %}
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('inventario.editar', pid=p.id) }}" title="Editar"><i class="bi bi-pencil"></i></a>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">
+          No hay productos{% if q %} que coincidan con «{{ q }}»{% endif %}.
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+    <span class="text-muted small">{{ total }} producto{{ '' if total == 1 else 's' }}</span>
+    {% if paginas > 1 %}
+    <nav><ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if pagina <= 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('inventario.lista', q=q, filtro=filtro, pagina=pagina-1) }}">Anterior</a></li>
+      <li class="page-item disabled"><span class="page-link">{{ pagina }} / {{ paginas }}</span></li>
+      <li class="page-item {% if pagina >= paginas %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('inventario.lista', q=q, filtro=filtro, pagina=pagina+1) }}">Siguiente</a></li>
+    </ul></nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

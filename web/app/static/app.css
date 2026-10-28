@@ -1,0 +1,22 @@
+body { background: #f4f6f9; }
+.card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.kpi .valor { font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+.kpi .etiqueta { color: #6c757d; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; }
+.table td, .table th { vertical-align: middle; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-card { width: 100%; max-width: 380px; }
+
+/* Caja */
+#buscador { font-size: 1.25rem; }
+#resultados { position: absolute; z-index: 1000; width: 100%; max-height: 360px; overflow-y: auto; }
+.total-caja { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.carrito input.cantidad { width: 80px; }
+.stock-bajo { color: #b45309; font-weight: 600; }
+.sin-stock { color: #dc3545; font-weight: 600; }
+
+@media print {
+  body { background: #fff; }
+  .card { box-shadow: none; }
+}
+.carrito .input-group { width: 140px; margin: 0 auto; }

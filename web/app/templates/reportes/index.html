@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titulo %}Reportes{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">Reportes</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('reportes.exportar', desde=desde, hasta=hasta) }}"><i class="bi bi-download"></i> Exportar detalle CSV</a>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <form class="row g-2 align-items-end" method="get" id="form-rango">
+    <div class="col-6 col-md-3"><label class="form-label small">Desde</label>
+      <input class="form-control" type="date" name="desde" value="{{ desde }}"></div>
+    <div class="col-6 col-md-3"><label class="form-label small">Hasta</label>
+      <input class="form-control" type="date" name="hasta" value="{{ hasta }}"></div>
+    <div class="col-md-2 d-grid"><button class="btn btn-secondary">Ver</button></div>
+    <div class="col-md-4 d-flex flex-wrap gap-1">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-rango="hoy">Hoy</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-rango="7">7 días</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-rango="mes">Este mes</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-rango="mes-ant">Mes anterior</button>
+    </div>
+  </form>
+</div></div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Total vendido</div><div class="valor">{{ resumen.total|dinero }}</div>
+    <div class="small text-muted">{{ resumen.ventas }} ventas · {{ ganancia.piezas|numero }} piezas</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Ganancia bruta</div><div class="valor text-success">{{ ganancia.ganancia|dinero }}</div>
+    <div class="small text-muted">Precio − costo registrado</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Ticket promedio</div><div class="valor">{{ ticket_promedio|dinero }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="card kpi p-3"><div class="etiqueta">Canceladas</div><div class="valor">{{ resumen.canceladas }}</div>
+    <div class="small text-muted">{{ resumen.total_cancelado|dinero }}</div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header bg-white"><strong>Productos más vendidos</strong></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Producto</th><th class="num">Piezas</th><th class="num">Vendido</th><th class="num">Ganancia</th></tr></thead>
+          <tbody>
+          {% for t in top %}
+            <tr>
+              <td><a href="{{ url_for('inventario.detalle', pid=t.id) }}">{{ t.nombre }}</a><div class="small text-muted">{{ t.codigo }}</div></td>
+              <td class="num">{{ t.piezas|numero }}</td>
+              <td class="num">{{ t.total|dinero }}</td>
+              <td class="num">{{ t.ganancia|dinero }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-muted text-center py-3">Sin ventas en este periodo.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header bg-white"><strong>Ventas por día</strong></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Día</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead>
+          <tbody>
+          {% for d in por_dia %}
+            <tr><td>{{ d.dia|fecha_corta }}</td><td class="num">{{ d.ventas }}</td><td class="num">{{ d.total|dinero }}</td></tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-3">Sin ventas en este periodo.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-rango]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var f = document.getElementById('form-rango'), h = new Date(), d = new Date(), a = new Date();
+    var iso = function (x) { return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+    switch (b.dataset.rango) {
+      case 'hoy': break;
+      case '7': d.setDate(h.getDate() - 6); break;
+      case 'mes': d = new Date(h.getFullYear(), h.getMonth(), 1); break;
+      case 'mes-ant': d = new Date(h.getFullYear(), h.getMonth() - 1, 1); a = new Date(h.getFullYear(), h.getMonth(), 0); break;
+    }
+    f.desde.value = iso(d); f.hasta.value = iso(a); f.submit();
+  });
+});
+</script>
+{% endblock %}

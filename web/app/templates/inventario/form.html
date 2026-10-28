@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar producto' if producto else 'Nuevo producto' }}{% endblock %}
+{% block contenido %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card p-4">
+      <h1 class="h4 mb-3">{{ 'Editar producto' if producto else 'Nuevo producto' }}</h1>
+      <form method="post" id="form-producto">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label">Código / código de barras *</label>
+            <input class="form-control" name="codigo" required maxlength="64" value="{{ form.codigo or '' }}"
+                   {% if not producto %}autofocus{% endif %} placeholder="Escanea o escribe el SKU">
+            <div class="form-text">Con el lector de código de barras, solo escanea aquí.</div>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label">Nombre *</label>
+            <input class="form-control" name="nombre" required maxlength="200" value="{{ form.nombre or '' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">Precio de venta *</label>
+            <div class="input-group"><span class="input-group-text">$</span>
+              <input class="form-control" name="precio" required inputmode="decimal" value="{{ form.precio if form.precio is not none else '' }}"></div>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">Costo</label>
+            <div class="input-group"><span class="input-group-text">$</span>
+              <input class="form-control" name="costo" inputmode="decimal" value="{{ form.costo if form.costo is not none else '' }}"></div>
+          </div>
+          {% if not producto %}
+          <div class="col-6 col-md-3 solo-stock">
+            <label class="form-label">Stock inicial</label>
+            <input class="form-control" name="stock" type="number" min="0" step="1" value="{{ form.stock or 0 }}">
+          </div>
+          {% else %}
+          <div class="col-6 col-md-3 solo-stock">
+            <label class="form-label">Stock actual</label>
+            <input class="form-control" value="{{ producto.stock }}" disabled>
+            <div class="form-text">Se cambia desde «Entrada / ajuste».</div>
+          </div>
+          {% endif %}
+          <div class="col-6 col-md-3 solo-stock">
+            <label class="form-label">Stock mínimo</label>
+            <input class="form-control" name="stock_minimo" type="number" min="0" step="1" value="{{ form.stock_minimo or 0 }}">
+            <div class="form-text">Alerta cuando el stock llegue a este número.</div>
+          </div>
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="es_servicio" name="es_servicio" value="1"
+                     {% if form.es_servicio in (true, '1') %}checked{% endif %}>
+              <label class="form-check-label" for="es_servicio">Es un servicio (sin control de stock, ej. impresiones)</label>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 d-flex flex-wrap gap-2">
+          <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Guardar</button>
+          {% if not producto %}
+          <button class="btn btn-outline-primary" name="otro" value="1"><i class="bi bi-plus-lg"></i> Guardar y agregar otro</button>
+          {% endif %}
+          <a class="btn btn-link" href="{{ url_for('inventario.detalle', pid=producto.id) if producto else url_for('inventario.lista') }}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// El lector de código de barras envía "Enter" al final: evitar que mande el formulario desde el campo de código
+var sw = document.getElementById('es_servicio');
+function toggleStock() {
+  document.querySelectorAll('.solo-stock').forEach(function (el) { el.classList.toggle('d-none', sw.checked); });
+}
+sw.addEventListener('change', toggleStock); toggleStock();
+document.querySelector('[name=codigo]').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); document.querySelector('[name=nombre]').focus(); }
+});
+</script>
+{% endblock %}

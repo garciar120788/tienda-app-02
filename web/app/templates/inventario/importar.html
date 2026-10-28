@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Importar inventario{% endblock %}
+{% block contenido %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('inventario.lista') }}">Inventario</a></li>
+  <li class="breadcrumb-item active">Importar</li>
+</ol></nav>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <h1 class="h4 mb-3"><i class="bi bi-upload"></i> Importar desde Excel o CSV</h1>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label class="form-label">Archivo (.xlsx o .csv, máximo 5 MB)</label>
+          <input class="form-control" type="file" name="archivo" accept=".xlsx,.csv" required>
+        </div>
+        <button class="btn btn-primary"><i class="bi bi-eye"></i> Ver vista previa</button>
+        <span class="text-muted small ms-2">Nada se guarda hasta que confirmes.</span>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card p-4">
+      <h2 class="h6">Formato del archivo</h2>
+      <p class="small mb-2">La primera fila debe tener los encabezados:</p>
+      <table class="table table-sm small">
+        <tr><td><code>codigo</code></td><td>Obligatorio. SKU o código de barras.</td></tr>
+        <tr><td><code>nombre</code></td><td>Obligatorio.</td></tr>
+        <tr><td><code>precio</code></td><td>Obligatorio. Precio de venta.</td></tr>
+        <tr><td><code>costo</code></td><td>Opcional.</td></tr>
+        <tr><td><code>stock</code></td><td>Opcional. Piezas.</td></tr>
+        <tr><td><code>stock_minimo</code></td><td>Opcional. Para la alerta.</td></tr>
+      </table>
+      <p class="small text-muted">Si el código ya existe, el producto se actualiza. En la vista previa eliges si el stock del archivo
+        se <strong>suma</strong> al actual o lo <strong>reemplaza</strong>.</p>
+      <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-success" href="{{ url_for('inventario.plantilla', fmt='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Plantilla Excel</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('inventario.plantilla', fmt='csv') }}"><i class="bi bi-filetype-csv"></i> Plantilla CSV</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

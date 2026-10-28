@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block titulo %}Caja{% endblock %}
+{% block contenedor %}container-fluid py-3{% endblock %}
+{% block contenido %}
+<div class="row g-3">
+  <!-- Búsqueda y carrito -->
+  <div class="col-lg-8">
+    <div class="card p-3 mb-3">
+      <div class="position-relative">
+        <div class="input-group input-group-lg">
+          <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+          <input id="buscador" class="form-control" autocomplete="off" autofocus
+                 placeholder="Escanea el código de barras o escribe el nombre y presiona Enter">
+        </div>
+        <div id="resultados" class="list-group shadow d-none"></div>
+      </div>
+      <div id="aviso" class="small mt-2 text-danger" role="status"></div>
+
+      {% if impresiones %}
+      <div class="mt-3 pt-3 border-top">
+        <div class="d-flex flex-wrap justify-content-between align-items-baseline mb-2">
+          <h2 class="h6 mb-0"><i class="bi bi-printer"></i> Impresiones</h2>
+          <span class="small text-muted">Para varias, escribe la cantidad arriba (ej. 10) y luego toca el botón</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2" id="impresiones">
+          {% for s in impresiones %}
+          <button type="button" class="btn {{ 'btn-outline-primary' if s.precio|float > 0 else 'btn-outline-secondary' }} btn-servicio"
+                  data-id="{{ s.id }}" data-codigo="{{ s.codigo }}" data-nombre="{{ s.nombre }}" data-precio="{{ s.precio }}">
+            <span class="fw-semibold">{{ s.etiqueta }}</span>
+            <span class="d-block small precio-servicio">{% if s.precio|float > 0 %}{{ s.precio|dinero }}{% else %}sin precio{% endif %}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 carrito">
+          <thead class="table-light">
+            <tr><th>Producto</th><th class="num">Precio</th><th class="text-center">Cantidad</th><th class="num">Subtotal</th><th></th></tr>
+          </thead>
+          <tbody id="carrito">
+            <tr id="carrito-vacio"><td colspan="5" class="text-center text-muted py-5">
+              <i class="bi bi-cart fs-1 d-block"></i>Escanea o busca un producto para comenzar
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cobro -->
+  <div class="col-lg-4">
+    <div class="card p-3 position-sticky" style="top: 70px">
+      <div class="text-muted small text-uppercase">Total</div>
+      <div class="total-caja" id="total">$0.00</div>
+      <div class="text-muted small mb-3" id="piezas">0 piezas</div>
+
+      <label class="form-label" for="pago">Pago recibido (opcional)</label>
+      <div class="input-group input-group-lg mb-2">
+        <span class="input-group-text">$</span>
+        <input id="pago" class="form-control" inputmode="decimal" placeholder="0.00">
+      </div>
+      <div class="d-flex justify-content-between mb-3 fs-5">
+        <span>Cambio</span><strong id="cambio">—</strong>
+      </div>
+
+      <button id="btn-cobrar" class="btn btn-success btn-lg w-100 mb-2" disabled>
+        <i class="bi bi-check2-circle"></i> Cobrar <span class="small">(F2)</span>
+      </button>
+      <button id="btn-limpiar" class="btn btn-outline-secondary w-100" disabled>
+        <i class="bi bi-trash"></i> Vaciar venta
+      </button>
+      <div id="error-venta" class="alert alert-danger mt-3 d-none" style="white-space: pre-line"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const CSRF = document.querySelector('meta[name=csrf-token]').content;
+  const $ = (id) => document.getElementById(id);
+  const buscador = $('buscador'), resultados = $('resultados'), aviso = $('aviso');
+  const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+  // carrito: Map producto_id -> {id, codigo, nombre, precio (centavos), stock, cantidad}
+  const carrito = new Map();
+  let listaActual = [], seleccion = -1, enviando = false;
+
+  const centavos = (txt) => Math.round(parseFloat(txt) * 100);
+  const dinero = (c) => fmt.format(c / 100);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+  function mostrarAviso(msg) {
+    aviso.textContent = msg || '';
+  }
+
+  function agregar(p, cantidad = 1) {
+    const actual = carrito.get(p.id);
+    const nueva = (actual ? actual.cantidad : 0) + cantidad;
+    if (p.es_servicio && !(centavos(p.precio) > 0)) {
+      mostrarAviso(`«${p.nombre}» no tiene precio. Defínelo en Inventario antes de venderlo.`);
+      return;
+    }
+    if (!p.es_servicio && nueva > p.stock) {
+      mostrarAviso(p.stock === 0 ? `«${p.nombre}» no tiene stock.` : `«${p.nombre}»: solo hay ${p.stock} en stock.`);
+      return;
+    }
+    mostrarAviso('');
+    carrito.set(p.id, { id: p.id, codigo: p.codigo, nombre: p.nombre, precio: centavos(p.precio),
+                        stock: p.es_servicio ? Infinity : p.stock, servicio: !!p.es_servicio, cantidad: nueva });
+    pintar(p.id);
+  }
+
+  function pintar(resaltar) {
+    const tbody = $('carrito');
+    tbody.querySelectorAll('tr[data-id]').forEach((tr) => tr.remove());
+    $('carrito-vacio').classList.toggle('d-none', carrito.size > 0);
+    let total = 0, piezas = 0;
+    for (const it of carrito.values()) {
+      const sub = it.precio * it.cantidad;
+      total += sub; piezas += it.cantidad;
+      const tr = document.createElement('tr');
+      tr.dataset.id = it.id;
+      if (it.id === resaltar) tr.className = 'table-success';
+      tr.innerHTML = `
+        <td>${esc(it.nombre)}<div class="small text-muted">${esc(it.codigo)} · ${it.servicio ? 'servicio' : 'stock ' + it.stock}</div></td>
+        <td class="num">${dinero(it.precio)}</td>
+        <td class="text-center">
+          <div class="input-group input-group-sm justify-content-center flex-nowrap">
+            <button class="btn btn-outline-secondary menos" type="button" aria-label="Menos">−</button>
+            <input class="form-control text-center cantidad" type="number" min="1" ${it.servicio ? '' : `max="${it.stock}"`} value="${it.cantidad}">
+            <button class="btn btn-outline-secondary mas" type="button" aria-label="Más">+</button>
+          </div>
+        </td>
+        <td class="num fw-semibold">${dinero(sub)}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-danger quitar" type="button" aria-label="Quitar"><i class="bi bi-x-lg"></i></button></td>`;
+      tbody.appendChild(tr);
+    }
+    $('total').textContent = dinero(total);
+    $('total').dataset.centavos = total;
+    $('piezas').textContent = `${piezas} pieza${piezas === 1 ? '' : 's'}`;
+    $('btn-cobrar').disabled = carrito.size === 0;
+    $('btn-limpiar').disabled = carrito.size === 0;
+    calcularCambio();
+    if (resaltar) setTimeout(() => { const f = tbody.querySelector(`tr[data-id="${resaltar}"]`); if (f) f.className = ''; }, 600);
+  }
+
+  function calcularCambio() {
+    const total = parseInt($('total').dataset.centavos || '0', 10);
+    const txt = $('pago').value.trim().replace(',', '.');
+    if (!txt) { $('cambio').textContent = '—'; $('cambio').className = ''; return; }
+    const pago = centavos(txt);
+    if (isNaN(pago)) { $('cambio').textContent = '—'; return; }
+    const cambio = pago - total;
+    $('cambio').textContent = cambio >= 0 ? dinero(cambio) : `Faltan ${dinero(-cambio)}`;
+    $('cambio').className = cambio >= 0 ? 'text-success' : 'text-danger';
+  }
+
+  // Eventos del carrito
+  $('carrito').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    const it = carrito.get(parseInt(tr.dataset.id, 10));
+    if (e.target.closest('.quitar')) { carrito.delete(it.id); pintar(); buscador.focus(); }
+    else if (e.target.closest('.mas')) {
+      if (it.cantidad < it.stock) { it.cantidad++; pintar(); } else mostrarAviso(`Solo hay ${it.stock} de «${it.nombre}».`);
+    } else if (e.target.closest('.menos')) {
+      if (it.cantidad > 1) { it.cantidad--; pintar(); }
+    }
+  });
+  $('carrito').addEventListener('change', (e) => {
+    if (!e.target.classList.contains('cantidad')) return;
+    const it = carrito.get(parseInt(e.target.closest('tr').dataset.id, 10));
+    let n = parseInt(e.target.value, 10);
+    if (isNaN(n) || n < 1) n = 1;
+    if (n > it.stock) { n = it.stock; mostrarAviso(`Solo hay ${it.stock} de «${it.nombre}».`); }
+    it.cantidad = n;
+    pintar();
+  });
+
+  // Búsqueda
+  async function buscar(q) {
+    const r = await fetch('/api/productos?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+    if (r.status === 401) { location.href = '/login?next=/caja'; return null; }
+    return r.json();
+  }
+
+  function mostrarResultados(lista) {
+    listaActual = lista; seleccion = lista.length ? 0 : -1;
+    if (!lista.length) { resultados.classList.add('d-none'); return; }
+    resultados.innerHTML = lista.map((p, i) => `
+      <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between ${i === 0 ? 'active' : ''}" data-i="${i}">
+        <span>${esc(p.nombre)} <small class="${i === 0 ? '' : 'text-muted'}">${esc(p.codigo)}</small></span>
+        <span>${dinero(centavos(p.precio))} <small class="${!p.es_servicio && p.stock === 0 ? 'text-danger' : ''}">· ${p.es_servicio ? 'servicio' : p.stock + ' pzas'}</small></span>
+      </button>`).join('');
+    resultados.classList.remove('d-none');
+  }
+
+  function elegir(i) {
+    const p = listaActual[i];
+    if (p) agregar(p);
+    resultados.classList.add('d-none');
+    buscador.value = '';
+    buscador.focus();
+  }
+
+  let temporizador;
+  buscador.addEventListener('input', () => {
+    clearTimeout(temporizador);
+    const q = buscador.value.trim();
+    if (q.length < 2) { resultados.classList.add('d-none'); return; }
+    temporizador = setTimeout(async () => {
+      const d = await buscar(q);
+      if (d && buscador.value.trim() === q) mostrarResultados(d.resultados);
+    }, 250);
+  });
+
+  buscador.addEventListener('keydown', async (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!listaActual.length) return;
+      e.preventDefault();
+      seleccion = (seleccion + (e.key === 'ArrowDown' ? 1 : -1) + listaActual.length) % listaActual.length;
+      resultados.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === seleccion));
+      return;
+    }
+    if (e.key === 'Escape') { resultados.classList.add('d-none'); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    clearTimeout(temporizador);
+    const q = buscador.value.trim();
+    if (!q) return;
+    // Soporta "3*codigo" para agregar varias piezas a la vez
+    let cantidad = 1, termino = q;
+    const m = q.match(/^(\d+)\s*[*xX]\s*(.+)$/);
+    if (m) { cantidad = parseInt(m[1], 10); termino = m[2].trim(); }
+    const d = await buscar(termino);
+    if (!d) return;
+    if (d.exacto) {
+      agregar(d.exacto, cantidad);
+      buscador.value = ''; resultados.classList.add('d-none');
+    } else if (!resultados.classList.contains('d-none') && seleccion >= 0 && listaActual.length && !m) {
+      elegir(seleccion);
+    } else if (d.resultados.length === 1) {
+      agregar(d.resultados[0], cantidad);
+      buscador.value = ''; resultados.classList.add('d-none');
+    } else if (d.resultados.length) {
+      mostrarResultados(d.resultados);
+    } else {
+      mostrarAviso(`No se encontró ningún producto con «${termino}».`);
+      buscador.select();
+    }
+  });
+
+  // Botones de impresiones: agregan 1, o la cantidad escrita en el buscador
+  document.querySelectorAll('.btn-servicio').forEach((b) => {
+    b.addEventListener('click', () => {
+      let cantidad = 1;
+      const txt = buscador.value.trim();
+      if (/^\d{1,4}$/.test(txt) && parseInt(txt, 10) > 0) { cantidad = parseInt(txt, 10); buscador.value = ''; }
+      resultados.classList.add('d-none');
+      agregar({ id: parseInt(b.dataset.id, 10), codigo: b.dataset.codigo, nombre: b.dataset.nombre,
+                precio: b.dataset.precio, stock: 0, es_servicio: true }, cantidad);
+      buscador.focus();
+    });
+  });
+
+  resultados.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-i]');
+    if (b) elegir(parseInt(b.dataset.i, 10));
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#resultados') && e.target !== buscador) resultados.classList.add('d-none');
+  });
+
+  $('pago').addEventListener('input', calcularCambio);
+  $('pago').addEventListener('keydown', (e) => { if (e.key === 'Enter') cobrar(); });
+  $('btn-limpiar').addEventListener('click', () => {
+    carrito.clear(); $('pago').value = ''; pintar(); mostrarAviso(''); buscador.focus();
+  });
+  $('btn-cobrar').addEventListener('click', cobrar);
+  document.addEventListener('keydown', (e) => { if (e.key === 'F2') { e.preventDefault(); cobrar(); } });
+
+  async function cobrar() {
+    if (enviando || carrito.size === 0) return;
+    const err = $('error-venta');
+    err.classList.add('d-none');
+    const pagoTxt = $('pago').value.trim().replace(',', '.');
+    const total = parseInt($('total').dataset.centavos || '0', 10);
+    if (pagoTxt && centavos(pagoTxt) < total) {
+      err.textContent = 'El pago recibido es menor que el total.'; err.classList.remove('d-none'); return;
+    }
+    enviando = true;
+    $('btn-cobrar').disabled = true;
+    try {
+      const r = await fetch('/api/ventas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({
+          items: [...carrito.values()].map((it) => ({ producto_id: it.id, cantidad: it.cantidad })),
+          pago: pagoTxt || null,
+        }),
+      });
+      const d = await r.json().catch(() => ({ ok: false, error: 'Respuesta inesperada del servidor.' }));
+      if (r.status === 401) { location.href = '/login?next=/caja'; return; }
+      if (!d.ok) throw new Error(d.error || 'No se pudo registrar la venta.');
+      location.href = `/ventas/${d.venta_id}?nueva=1`;
+    } catch (ex) {
+      err.textContent = ex.message; err.classList.remove('d-none');
+      enviando = false;
+      $('btn-cobrar').disabled = carrito.size === 0;
+    }
+  }
+
+  // Advertir si se sale de la página con una venta en curso
+  window.addEventListener('beforeunload', (e) => {
+    if (carrito.size > 0 && !enviando) { e.preventDefault(); e.returnValue = ''; }
+  });
+})();
+</script>
+{% endblock %}
